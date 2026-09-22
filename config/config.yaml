@@ -1,0 +1,91 @@
+# Analysis parameters for the colorectal (TCGA-COAD + TCGA-READ) chemoresistance
+# pipeline. Same structure as the HNSC project's config.yaml - centralizing
+# these here means changing a cutoff doesn't require touching pipeline code.
+
+paths:
+  raw_counts: "data/raw/r_count_colorectal.csv"        # TCGA-COAD+READ STAR-Counts matrix (GDC, via TCGAbiolinks)
+  gene_index: "data/raw/index_assign_colorectal.csv"   # row-index -> gene symbol lookup
+  results_table: "results/tables/deseq2_results_full.csv"
+  filtered_padj05: "results/tables/filtered_genes_padj0.05.csv"
+  filtered_padj01: "results/tables/filtered_genes_padj0.01.csv"
+  candidate_genes_final: "results/tables/candidate_genes_final.csv"
+  gsea_results: "results/tables/gsea_hallmark_results.csv"
+  leading_edge_genes: "results/tables/gsea_leading_edge_genes.csv"
+  ora_up_in_S: "results/tables/ora_up_in_S.csv"
+  ora_up_in_C: "results/tables/ora_up_in_C.csv"
+  pca_plot: "results/figures/pca_plot.png"
+  volcano_plot_all: "results/figures/volcano_all_genes.png"
+  volcano_plot_labeled: "results/figures/volcano_labeled_genes.png"
+  gsea_plot: "results/figures/gsea_hallmark_plot.png"
+  # Per-pathway figures (enrichment curve + leading-edge heatmap) are written
+  # as "<figures_dir>/gsea_enrichment_<pathway>.png" and
+  # "<figures_dir>/gsea_heatmap_<pathway>.png" - see leading_edge_analysis.R.
+  figures_dir: "results/figures"
+  ora_dotplot_up_in_S: "results/figures/ora_dotplot_up_in_S.png"
+  ora_dotplot_up_in_C: "results/figures/ora_dotplot_up_in_C.png"
+
+filtering:
+  # NOT yet re-validated for this dataset. 30 was the right cutoff for the
+  # HNSC matrix (41 samples, a pre-filtered ~pre-existing gene set); this
+  # matrix is TCGAbiolinks' full 60,660-gene GENCODE annotation for 87
+  # samples, which includes many more zero/near-zero-count genes (lots of
+  # pseudogenes/lncRNAs never expressed in this tissue). Check
+  # nrow(counts_filtered) after your first run - if it's implausibly small
+  # or large relative to a typical ~15-20k expressed-gene set, revisit this
+  # number before trusting anything downstream.
+  min_row_mean: 30
+
+design:
+  # C = chemoresistant (Progressive Disease under chemotherapy, n=19),
+  # S = chemosensitive (Complete Response under chemotherapy, n=68).
+  # TCGA-COAD + TCGA-READ, restricted to disease_type == "Adenomas and
+  # Adenocarcinomas" and a single unambiguous chemo-outcome call - see
+  # chemoresistant_ids/chemosensitive_ids in data_loader.R for exact
+  # inclusion criteria and provenance.
+  condition_levels: ["C", "S"]
+  contrast: ["condition", "S", "C"]   # results() contrast: S (chemosensitive) vs C (chemoresistant)
+
+thresholds:
+  # Carried over unchanged from the HNSC project as a starting point - NOT
+  # re-validated against this dataset's actual apeglm-shrunk results yet.
+  # This cohort is a different size and considerably more imbalanced
+  # (19:68 vs. HNSC's 25:16), so revisit padj_cutoff/log2fc_cutoff after
+  # your first run rather than assuming these numbers transfer cleanly.
+  padj_cutoff: 0.01
+  log2fc_cutoff: 2
+
+shrinkage:
+  method: "apeglm"
+
+gsea:
+  # Preranked GSEA against MSigDB Hallmark gene sets (H). Ranking metric is
+  # the pre-shrinkage Wald `stat`, not the apeglm-shrunk log2FC - see
+  # gsea_analysis.R for why. This section is fully generic/dataset-agnostic,
+  # unchanged from the HNSC config.
+  collection: "H"
+  min_size: 15      # drop pathways with fewer than this many genes present in the ranked list
+  max_size: 500     # drop overly generic/large pathways
+  padj_cutoff: 0.05
+  n_plot: 15        # fallback: top-N pathways by padj to plot if none clear padj_cutoff
+  seed: 42          # fgsea's estimation step has a stochastic component; fixed for reproducibility
+
+leading_edge:
+  # PLACEHOLDER - carried over from the HNSC project's top hits, which have
+  # no reason to also be this dataset's top hits. After your first run of
+  # gsea_analysis.R, open results/tables/gsea_hallmark_results.csv, find the
+  # actual strongest hit in each direction (by padj) for THIS dataset, and
+  # replace both entries below before running leading_edge_analysis.R -
+  # it will error out (deliberately - see that script) if a listed pathway
+  # isn't actually in your GSEA results.
+  focus_pathways: ["HALLMARK_E2F_TARGETS", "HALLMARK_CHOLESTEROL_HOMEOSTASIS"]
+
+ora:
+  # Complementary Over-Representation Analysis (ORA), unchanged/generic from
+  # the HNSC config - see ora_analysis.R header for the rationale. Loosened
+  # relative to thresholds.padj_cutoff/log2fc_cutoff above for the same
+  # statistical-power reason as before; revisit only if your candidate gene
+  # list per direction ends up too small for a meaningful GO test.
+  padj_cutoff: 0.05
+  log2fc_cutoff: 1
+  ontology: "BP"    # GO Biological Process
+  show_categories: 15

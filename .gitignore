@@ -1,0 +1,11 @@
+# Raw TCGA/GDC data - large (100s of MB) and GDC data has its own
+# redistribution terms (see https://gdc.cancer.gov/access-data). Fully
+# reproducible via download_tcga_colorectal_counts.R rather than committed.
+data/raw/
+GDCdata/
+
+# RStudio per-user state (not the .Rproj file itself - that's tracked)
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
